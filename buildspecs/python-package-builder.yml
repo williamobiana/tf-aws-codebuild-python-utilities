@@ -1,0 +1,33 @@
+version: 0.2
+env:
+  shell: bash
+phases:
+  install:
+    runtime-versions:
+      python: ${PYTHON_VERSION}
+    commands:
+      - env | sort
+      - |-
+          if [ -z "${PYTHON_VERSION}" ] || [ -z "${PACKAGE_DIR}" ] || [ -z "${REQUIREMENTS_FILE}" ]  || [ -z "${S3_ARTIFACT_BUCKET_NAME}" ]   || [ -z "${S3_ARTIFACT_OUTPUT_PATH}" ] ; then
+            echo "The following variables must be present when using this Project: PYTHON_VERSION, PACKAGE_DIR, REQUIREMENTS_FILE, S3_ARTIFACT_BUCKET_NAME, S3_ARTIFACT_OUTPUT_PATH"
+            echo "Default values are set for the following: PYTHON_VERSION, PACKAGE_DIR (./), REQUIREMENTS_FILE (requirements.txt), S3_ARTIFACT_BUCKET_NAME (<account-id>-prd-operations-artifacts)"
+            exit 1
+          fi
+  pre_build:
+    commands:
+      - |-
+          if [[ -d /target ]] ; then
+            rm -rf /target
+          fi
+      - mkdir /target
+      - cp -a ${PACKAGE_DIR}/. /target/
+      - cd /target
+  build:
+    commands:
+      - pip install -r ./${REQUIREMENTS_FILE} -t ./ --quiet
+      - zip -r package.zip .
+      - openssl dgst -sha256 -binary "package.zip" | openssl enc -A -base64 > "package.base64sha256"
+  post_build:
+    commands:
+      - aws s3 cp --no-progress package.zip s3://${S3_ARTIFACT_BUCKET_NAME}/${S3_ARTIFACT_OUTPUT_PATH}/package.zip
+      - aws s3 cp --no-progress --content-type text/plain package.base64sha256 s3://${S3_ARTIFACT_BUCKET_NAME}/${S3_ARTIFACT_OUTPUT_PATH}/package.base64sha256

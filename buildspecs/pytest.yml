@@ -1,0 +1,29 @@
+version: 0.2
+env:
+  shell: bash
+phases:
+  install:
+    runtime-versions:
+      python: ${PYTHON_VERSION}
+    commands:
+      - env | sort
+      - |-
+          if [ -z "${PYTHON_VERSION}" ] || [ -z "${TEST_DIR}" ] || [ -z "${REQUIREMENTS_FILE}" ] ; then
+            echo "The following variables must be present when using this Project: PYTHON_VERSION, TEST_DIR, REQUIREMENTS_FILE"
+            echo "The following variables are optional: PYTEST_ARGS"
+            exit 1
+          fi
+  pre_build:
+    commands:
+      - cd ${TEST_DIR}
+      - pip install -r ${REQUIREMENTS_FILE}
+      - pip install pytest
+  build:
+    commands:
+      - pytest --junitxml=reports/report.xml ${PYTEST_ARGS}
+reports:
+  pytest_logging_reports:
+    files:
+      - report.xml
+    base-directory: ${TEST_DIR}/reports
+    file-format: JUNITXML
